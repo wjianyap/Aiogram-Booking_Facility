@@ -21,6 +21,7 @@ load_dotenv()
 TOKEN_API = os.getenv("TOKEN_API")
 GSHEET_KEY_ID = os.getenv("GSHEET_KEY_ID")
 ALLOWED_USERS = json.loads(os.environ['ALLOWED_USERS'])
+ADMIN_USERS = json.loads(os.environ['ADMIN_USERS'])
 
 bot = Bot(token=TOKEN_API)
 dp = Dispatcher()
