@@ -18,6 +18,7 @@ class AccessControlMiddleware(BaseMiddleware):
         return await handler(event, data)
     
 class Booking(StatesGroup):
+    user_id = State()
     facility = State()
     date = State()
     start_time = State()
@@ -61,3 +62,17 @@ def is_valid_email(email):
         # Email is not valid, exception message is human-readable
         print(str(e))
         return False
+
+def print_summary(data):
+    day_of_week = data["date"].strftime("%A")
+    return (
+            f"Booking Details\n"
+            f"================\n"
+            f"Facility: {data['facility']}\n"
+            f"Date: {data["date"].strftime("%d/%m/%Y")} ({day_of_week})\n"
+            f"Start time: {data['start_time']}\n"
+            f"End time: {data['end_time']}\n"
+            f"Email: {data['email']}\n"
+            f"Name: {data['name']}\n"
+            f"Contact Number: {data['contact_number']}\n"
+    )
