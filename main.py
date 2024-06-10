@@ -71,13 +71,21 @@ async def date_handler(call: CallbackQuery, callback_data: dict, state: FSMConte
 
 @dp.message(Booking.start_time)
 async def start_time_handler(message: types.Message, state: FSMContext):
-    if is_valid_time_format(message.text):
-        await state.update_data(start_time=message.text)
-    else:
-        await message.reply(
-            "Invalid time format. Please enter the start time of booking (hhmm)"
-        )
+    data = await state.get_data()
+    try:
+        user_time = datetime.strptime(message.text, "%H%M").time()
+    except ValueError:
+        await message.reply("Invalid time format. Please enter the start time of booking (hhmm)")
         return
+    
+    # If the selected date is today, check if the user's time is not before the current time
+    if data['date'].date() == datetime.now().date() and user_time < datetime.now().time():
+        await message.reply(f"Invalid time!\n"
+                            f"Start time cannot be before the current time. "
+                            f"Please enter the start time of booking (hhmm)")
+        return
+
+    await state.update_data(start_time=message.text)
     await state.set_state(Booking.end_time)
     await message.reply("Please enter the end time of booking (hhmm)")
 
