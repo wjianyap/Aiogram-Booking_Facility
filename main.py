@@ -1,10 +1,4 @@
-import asyncio
-import logging
-import sys
-import os
-import gspread
-import json
-import uuid
+import asyncio, logging, sys, os, gspread, json, uuid
 from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
@@ -15,7 +9,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.enums.parse_mode import ParseMode
 from dotenv import load_dotenv
 
-from functions import AccessControlMiddleware, Booking, is_valid_time_format, is_valid_contact_number, is_valid_email, print_summary
+from functions import AccessControlMiddleware, Booking, is_valid_time_format, is_valid_contact_number, is_valid_email, print_summary, is_admin, get_admin_id_username, all_admin_id
 from dataList import facility_list, commands
 
 load_dotenv()
@@ -24,10 +18,8 @@ booking_requests = {}
 TOKEN_API = os.getenv("TOKEN_API")
 GSHEET_KEY_ID = os.getenv("GSHEET_KEY_ID")
 ALLOWED_USERS = json.loads(os.environ['ALLOWED_USERS'])
-ADMIN_USERS = json.loads(os.environ['ADMIN_USERS'])
-
-admin_users_username_str = os.getenv("ADMIN_USERS_USERNAME")
-ADMIN_USERS_USERNAME = json.loads(admin_users_username_str)
+ADMIN_USERS_STR = os.getenv("ADMIN_USERS")
+ADMIN_USERS = json.loads(ADMIN_USERS_STR)
 
 bot = Bot(token=TOKEN_API)
 dp = Dispatcher()
@@ -168,24 +160,26 @@ async def confirmation_handler(message: types.Message, state: FSMContext):
     
     # Generate a unique identifier for this booking request
     booking_id = str(uuid.uuid4())
-    booking_requests[booking_id] = data
-    print(booking_requests)
+    booking_requests[booking_id] = {"data": data, "processed": False, "message_ids": {}}
     booking_request = (f"New booking request:\n\n"+print_summary(data)+"\n\n")
 
-    if message.from_user.id not in ADMIN_USERS:
+    if not is_admin(message.from_user.id):
         inline_kb = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Approve", callback_data=f"approve_{booking_id}"),
             InlineKeyboardButton(text="Reject", callback_data=f"reject_{booking_id}")],
         ])
 
-        for admin_id in ADMIN_USERS:
-            await bot.send_message(admin_id, booking_request, reply_markup=inline_kb)
+        for admin_id in all_admin_id():
+            try:
+                sent_message = await bot.send_message(admin_id, booking_request, reply_markup=inline_kb)
+                booking_requests[booking_id]["message_ids"][admin_id] = sent_message.message_id
+            except Exception as e:
+                logging.error(f"Error sending message to admin {admin_id}: {e}")
 
         await message.reply(
             f"Your booking request has been sent for approval. You will be notified once it is reviewed.\n\n"+print_summary(data)
         )
     else:
-        print('hello')
         data["date"] = data["date"].strftime("%m/%d/%Y")
         worksheet.append_row(list(data.values()), value_input_option="USER_ENTERED")
         global existing_booking
@@ -196,27 +190,29 @@ async def confirmation_handler(message: types.Message, state: FSMContext):
 @dp.callback_query(lambda call: call.data.startswith("approve_"))
 async def approve_booking(call: CallbackQuery):
     booking_id = call.data.split("_")[1]
-    data = booking_requests.get(booking_id)
+    booking_info = booking_requests.get(booking_id)
 
-    if data:
-        date_display = datetime.strptime(data["date"], "%m/%d/%Y").strftime("%d/%m/%Y")
-        start_time_display = datetime.strptime(data["start_time"], "%H:%M").strftime("%H%M")
-        end_time_display = datetime.strptime(data["end_time"], "%H:%M").strftime("%H%M")
+    if booking_info and not booking_info["processed"]:
+        data = booking_info["data"]
+        booking_info["processed"] = True
 
-        for key, value in ADMIN_USERS_USERNAME.items():
-            key = int(key)
-            if call.from_user.id == key:
-                admin_name = value
+        for admin_id, message_id in booking_info["message_ids"].items():
+            try:
+                await bot.edit_message_reply_markup(admin_id, message_id, reply_markup=None)
+            except Exception as e:
+                logging.error(f"Error removing inline keyboard for admin {admin_id}: {e}")
 
-        await bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
-        await bot.send_message(call.from_user.id, f"Booking approved for:\nFacility: {data['facility']}\nDate: {date_display}\nStart Time: {start_time_display}\nEnd Time: {end_time_display}.\nApproved by {admin_name}.")
+        approval_message = f"Booking approved by {get_admin_id_username(call.from_user.id)[1]}\n\n{print_summary(data)}"
+        
+        for admin_id in all_admin_id():
+            await bot.send_message(admin_id, approval_message)
 
-        # Notify the user
         user_message = (
-            f"Your booking has been *APPROVED* by {admin_name}!\n\n"+print_summary(data)
+            f"Your booking has been *APPROVED* by {get_admin_id_username(call.from_user.id)[1]}!\n\n{print_summary(data)}"
         )
-        await bot.send_message(data['user_id'], user_message, parse_mode=ParseMode.MARKDOWN)  
+        await bot.send_message(data['user_id'], user_message, parse_mode=ParseMode.MARKDOWN)   
 
+        data["date"] = data["date"].strftime("%m/%d/%Y")
         worksheet.append_row(list(data.values()), value_input_option="USER_ENTERED")
         global existing_booking
         existing_booking = worksheet.get_all_values()
@@ -231,21 +227,28 @@ async def approve_booking(call: CallbackQuery):
 @dp.callback_query(lambda call: call.data.startswith("reject_"))
 async def reject_booking(call: CallbackQuery):
     booking_id = call.data.split("_")[1]
-    data = booking_requests.get(booking_id)
+    booking_info = booking_requests.get(booking_id)
 
-    if data:
-        for key, value in ADMIN_USERS_USERNAME.items():
-            key = int(key)
-            if call.from_user.id == key:
-                admin_name = value
-        await bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
-        await bot.send_message(call.from_user.id, f"Booking rejected by {admin_name}\n\n"+print_summary(data))
+    if booking_info and not booking_info["processed"]:
+        data = booking_info["data"]
+        booking_info["processed"] = True
+        
+        for admin_id, message_id in booking_info["message_ids"].items():
+            try:
+                await bot.edit_message_reply_markup(admin_id, message_id, reply_markup=None)
+            except Exception as e:
+                logging.error(f"Error removing inline keyboard for admin {admin_id}: {e}")
 
-        # Notify the user
+        rejection_message = f"Booking rejected by {get_admin_id_username(call.from_user.id)[1]}\n\n{print_summary(data)}"
+
+        for admin_id in all_admin_id():
+            await bot.send_message(admin_id, rejection_message)
+
         user_message = (
-            f"Your booking request has been *REJECTED* by {admin_name}.\n\n"+print_summary(data)
+            f"Your booking request has been *REJECTED* by {get_admin_id_username(call.from_user.id)[1]}.\n\n{print_summary(data)}"
         )
         await bot.send_message(data['user_id'], user_message, parse_mode=ParseMode.MARKDOWN)
+
         await call.answer("Booking rejected")
     else:
         await call.answer("Booking not found")
@@ -368,4 +371,4 @@ async def main() -> None:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-    asyncio.run(main())
+    asyncio.run(main()) 

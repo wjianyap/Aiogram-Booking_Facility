@@ -1,7 +1,15 @@
 import re
+import os
+import json
 from aiogram import types, BaseMiddleware
 from aiogram.fsm.state import State, StatesGroup
 from email_validator import validate_email, EmailNotValidError
+from dotenv import load_dotenv
+
+load_dotenv()
+
+ADMIN_USERS_STR = os.getenv("ADMIN_USERS")
+ADMIN_USERS = json.loads(ADMIN_USERS_STR)
 
 class AccessControlMiddleware(BaseMiddleware):
     def __init__(self, allowed_users):
@@ -76,3 +84,28 @@ def print_summary(data):
             f"Name: {data['name']}\n"
             f"Contact Number: {data['contact_number']}\n"
     )
+
+def is_admin(user_id):
+    for key in ADMIN_USERS.keys():
+        key = int(key)
+        if user_id == key:
+            return True
+    return False
+
+def get_admin_id_username(user_id):
+    for key, value in ADMIN_USERS.items():
+        key = int(key)
+        if user_id == key:
+            admin_id = key
+            admin_name = value
+    return admin_id, admin_name
+
+def all_admin_id():
+    admin_id_list = []
+    for key in ADMIN_USERS.keys():
+        admin_id_list.append(int(key))
+    return admin_id_list
+
+
+
+
