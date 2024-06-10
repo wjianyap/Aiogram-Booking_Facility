@@ -272,12 +272,12 @@ async def email_for_view_handler(message: types.Message, state: FSMContext):
         await message.reply("Invalid email. Please enter a valid email")
         return
     
-    user_bookings = [row for row in existing_booking[1:] if row[5] == email]  
+    user_bookings = [row for row in existing_booking[1:] if row[6] == email]  
     if not user_bookings:
         await message.reply("No bookings found for this email.")
     else:
         booking_details = "\n\n".join([
-            f"Facility: {row[0]}\nDate: {row[1]}\nStart Time: {row[2]}\nEnd Time: {row[3]}\nEmail: {row[5]}\nName: {row[6]}\nContact Number: {row[7]}"
+            f"Facility: {row[1]}\nDate: {row[2]}\nStart Time: {row[3]}\nEnd Time: {row[4]}\nEmail: {row[6]}\nName: {row[7]}\nContact Number: {row[8]}"
             for row in user_bookings
         ])
         await message.reply(f"Your bookings:\n\n{booking_details}")
@@ -297,7 +297,7 @@ async def email_for_cancel_handler(message: types.Message, state: FSMContext):
         await message.reply("Invalid email. Please enter a valid email")
         return
 
-    user_bookings = [row for row in existing_booking[1:] if row[5] == email]
+    user_bookings = [row for row in existing_booking[1:] if row[6] == email]
     if not user_bookings:
         await message.reply("No bookings found for this email.")
         await state.clear()
@@ -305,7 +305,7 @@ async def email_for_cancel_handler(message: types.Message, state: FSMContext):
         return
     
     cancel_kb = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text=f"Cancel {row[0]} on {row[1]} from {row[2]} to {row[3]}")]for row in user_bookings],
+        keyboard=[[KeyboardButton(text=f"Cancel {row[1]} on {row[2]} from {row[3]} to {row[4]}")]for row in user_bookings],
         resize_keyboard=True,
         one_time_keyboard=True,
     )
@@ -316,19 +316,20 @@ async def email_for_cancel_handler(message: types.Message, state: FSMContext):
 @dp.message(Booking.booking_to_cancel)
 async def booking_to_cancel_handler(message: types.Message, state: FSMContext):
     selected_booking = message.text.replace("Cancel ", "").split(" on ")
+    print(selected_booking)
     facility = selected_booking[0]
     date_time = selected_booking[1].split(" from ")
     date = date_time[0]
     start_end_time = date_time[1].split(" to ")
-    start_time = start_end_time[0]
-    end_time = start_end_time[1]
-    
+    start_time = start_end_time[0].replace(" ", "")
+    end_time = start_end_time[1].replace(" ", "")
+
     email = (await state.get_data()).get('email')
     booking_found = False
     
     for i, row in enumerate(existing_booking):
         if (
-            row[0] == facility and row[1] == date and row[2] == start_time and row[3] == end_time and row[5] == email
+            row[1] == facility and row[2] == date and row[3] == start_time and row[4] == end_time and row[6] == email
         ):
             worksheet.delete_rows(i + 1)
             existing_booking.pop(i)
