@@ -9,7 +9,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.enums.parse_mode import ParseMode
 from dotenv import load_dotenv
 
-from functions import AccessControlMiddleware, Booking, is_valid_time_format, is_valid_contact_number, is_valid_email, print_summary, is_admin, get_admin_id_username, all_admin_id
+from functions import AccessControlMiddleware, Booking, is_valid_time_format,\
+    is_valid_contact_number, is_valid_email, print_summary, is_admin, \
+        get_admin_id_username, all_admin_id
 from dataList import facility_list, commands
 
 load_dotenv()
@@ -361,7 +363,7 @@ async def end_handler(message: types.Message):
 
 async def main() -> None:
     global worksheet, existing_booking
-    gc = gspread.service_account(filename="credentials.json")
+    gc = gspread.service_account(filename="aiogram-facilitybooking-credentials.json")
     sh = gc.open_by_key(GSHEET_KEY_ID)
     worksheet = sh.worksheet("Booking_Details")
     existing_booking = worksheet.get_all_values()
