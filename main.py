@@ -303,7 +303,7 @@ async def email_for_cancel_handler(message: types.Message, state: FSMContext):
     if not is_valid_email(email):
         await message.reply("Invalid email. Please enter a valid email")
         return
-
+    existing_booking = worksheet.get_all_values()
     user_bookings = [row for row in existing_booking[1:] if row[6] == email]
     if not user_bookings:
         await message.reply("No bookings found for this email.")
@@ -322,19 +322,23 @@ async def email_for_cancel_handler(message: types.Message, state: FSMContext):
 
 @dp.message(Booking.booking_to_cancel)
 async def booking_to_cancel_handler(message: types.Message, state: FSMContext):
-    selected_booking = message.text.replace("Cancel ", "").split(" on ")
-    facility, = selected_booking[0], selected_booking[1].split(" from ")
-    date_time = selected_booking[1].split(" from ")
-    date = date_time[0]
-    start_end_time = date_time[1].split(" to ")
-    start_time = start_end_time[0].replace(" ", "")
-    end_time = start_end_time[1].replace(" ", "")
+    try:
+        selected_booking = message.text.replace("Cancel ", "").split(" on ")
+        facility = selected_booking[0]
+        date_time = selected_booking[1].split(" from ")
+        date = date_time[0]
+        start_end_time = date_time[1].split(" to ")
+        start_time = start_end_time[0].replace(" ", "")
+        end_time = start_end_time[1].replace(" ", "")
+    except (IndexError, ValueError):
+        await message.reply("Invalid format. Please select a booking to cancel from the list.")
+        return
 
     email = (await state.get_data()).get('email')
     booking_found = False
     
     for i, row in enumerate(existing_booking):
-        if (
+        if (    
             row[1] == facility and row[2] == date and row[3] == start_time and row[4] == end_time and row[6] == email
         ):
             worksheet.delete_rows(i + 1)
