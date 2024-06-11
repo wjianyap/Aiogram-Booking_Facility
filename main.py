@@ -72,46 +72,47 @@ async def date_handler(call: CallbackQuery, callback_data: dict, state: FSMConte
 @dp.message(Booking.start_time)
 async def start_time_handler(message: types.Message, state: FSMContext):
     data = await state.get_data()
-    try:
-        user_time = datetime.strptime(message.text, "%H%M").time()
-    except ValueError:
-        await message.reply("Invalid time format. Please enter the start time of booking (hhmm)")
-        return
+    if is_valid_time_format(message.text):
+        data['start_time'] = datetime.strptime(message.text, "%H%M").time().strftime("%H:%M")
     
-    # If the selected date is today, check if the user's time is not before the current time
-    if data['date'].date() == datetime.now().date() and user_time < datetime.now().time():
-        await message.reply(f"Invalid time!\n"
-                            f"Start time cannot be before the current time. "
-                            f"Please enter the start time of booking (hhmm)")
-        return
+        # If the selected date is today, check if the user's time is not before the current time
+        if data['date'].date() == datetime.now().date() and data['start_time'] < datetime.now().time():
+            await message.reply(f"Invalid time!\n"
+                                f"Start time cannot be before the current time. "
+                                f"Please enter the start time of booking (hhmm)")
+            return
 
-    await state.update_data(start_time=message.text)
-    await state.set_state(Booking.end_time)
-    await message.reply("Please enter the end time of booking (hhmm)")
+        await state.update_data(start_time=data['start_time'])
+        await state.set_state(Booking.end_time)
+        await message.reply("Please enter the end time of booking (hhmm)")
+    else:
+        await message.reply("Invalid time format. Please enter the start time of booking (hhmm)")
+
 
 @dp.message(Booking.end_time)
 async def end_time_handler(message: types.Message, state: FSMContext):
+    data = await state.get_data()
     if is_valid_time_format(message.text):
-        await state.update_data(end_time=message.text)
+        data['end_time'] = datetime.strptime(message.text, "%H%M").time().strftime("%H:%M")
+
+        if data['end_time'] <= data['start_time']:
+                await message.reply("End time cannot be before the start time or the same as the start time. Please re-enter the end time.")
+                await state.set_state(Booking.end_time)
+                return
+
+        await state.update_data(end_time=data['end_time'])
         await state.set_state(Booking.time_period)
-        data = await state.get_data()
         data["date"] = data["date"].strftime("%m/%d/%Y")
-        data["start_time"] = datetime.strptime(data["start_time"], "%H%M").strftime("%H:%M")
-        data["end_time"] = datetime.strptime(data["end_time"], "%H%M").strftime("%H:%M")
+
         time_period_obj = f"{data['start_time']}-{data['end_time']}"
         await state.update_data(time_period=time_period_obj)
         await state.set_state(Booking.email)
 
-        if data["end_time"] <= data["start_time"]:
-                await message.reply("End time cannot be before the start time. Please re-enter the end time.")
-                await state.set_state(Booking.end_time)
-                return
-
         booked = False
         for values in existing_booking[1:]:
-            if data["facility"] == values[0] and data['date'] == values[1]:
-                if (data["start_time"]<values[3] and data["end_time"]>values[2]):
-                    await message.reply(f"{data['facility']} has been already booked by {values[6]} on {values[1]}, from {values[2]} to {values[3]}. Please select another time slot.")
+            if data["facility"] == values[1] and data['date'] == values[2]:
+                if (data["start_time"]<values[4] and data["end_time"]>values[3]):
+                    await message.reply(f"{data['facility']} has been already booked by {values[7]} on {values[2]}, from {values[3]} to {values[4]}. Please select another time slot.")
                     booked = True
                     break
         if booked:
@@ -120,10 +121,8 @@ async def end_time_handler(message: types.Message, state: FSMContext):
         else:
             await message.reply("Please enter your email")
     else:
-        await message.reply(
-            "Invalid time format. Please enter the start time of booking (hhmm)"
-        )
-        return
+            await message.reply("Invalid time format. Please enter the end time of booking (hhmm)")
+
 
 @dp.message(Booking.email)
 async def email_handler(message: types.Message, state: FSMContext):
@@ -324,8 +323,7 @@ async def email_for_cancel_handler(message: types.Message, state: FSMContext):
 @dp.message(Booking.booking_to_cancel)
 async def booking_to_cancel_handler(message: types.Message, state: FSMContext):
     selected_booking = message.text.replace("Cancel ", "").split(" on ")
-    print(selected_booking)
-    facility = selected_booking[0]
+    facility, = selected_booking[0], selected_booking[1].split(" from ")
     date_time = selected_booking[1].split(" from ")
     date = date_time[0]
     start_end_time = date_time[1].split(" to ")
