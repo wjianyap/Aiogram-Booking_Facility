@@ -77,7 +77,7 @@ def print_summary(data):
             f"Booking Details\n"
             f"================\n"
             f"Facility: {data['facility']}\n"
-            f"Date: {data["date"].strftime("%d/%m/%Y")} ({day_of_week})\n"
+            f"Date: {data['date'].strftime("%d/%m/%Y")} ({day_of_week})\n"
             f"Start time: {data['start_time']}\n"
             f"End time: {data['end_time']}\n"
             f"Email: {data['email']}\n"
