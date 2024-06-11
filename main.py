@@ -20,6 +20,8 @@ booking_requests = {}
 TOKEN_API = os.getenv("TOKEN_API")
 GSHEET_KEY_ID = os.getenv("GSHEET_KEY_ID")
 ALLOWED_USERS = json.loads(os.environ['ALLOWED_USERS'])
+gSheet_credentials_str = os.getenv("GSHEET_CREDENTIALS")
+gSheet_credentials = json.loads(os.getenv("GSHEET_CREDENTIALS"))
 
 bot = Bot(token=TOKEN_API)
 dp = Dispatcher()
@@ -368,7 +370,9 @@ async def end_handler(message: types.Message):
 
 async def main() -> None:
     global worksheet, existing_booking
-    gc = gspread.service_account(filename="aiogram-facilitybooking-credentials.json")
+    
+    # open google sheets using credentials
+    gc = gspread.service_account_from_dict(gSheet_credentials)
     sh = gc.open_by_key(GSHEET_KEY_ID)
     worksheet = sh.worksheet("Booking_Details")
     existing_booking = worksheet.get_all_values()
