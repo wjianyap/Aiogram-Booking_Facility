@@ -144,8 +144,6 @@ async def contactNumber_handler(message: types.Message, state: FSMContext):
     if is_valid_contact_number(message.text):
         await state.update_data(contact_number=message.text)
         data = await state.get_data()
-        data["start_time"] = datetime.strptime(data["start_time"], "%H%M").strftime("%H:%M")
-        data["end_time"] = datetime.strptime(data["end_time"], "%H%M").strftime("%H:%M")
         await state.set_state(Booking.confirmation)
         await message.reply(print_summary(data)+"\nConfirm booking?",
             reply_markup=ReplyKeyboardMarkup(
@@ -162,8 +160,6 @@ async def contactNumber_handler(message: types.Message, state: FSMContext):
 @dp.message(lambda message: message.text.lower() == "yes", Booking.confirmation)
 async def confirmation_handler(message: types.Message, state: FSMContext):
     data = await state.get_data() 
-    data["start_time"] = datetime.strptime(data["start_time"], "%H%M").strftime("%H:%M")
-    data["end_time"] = datetime.strptime(data["end_time"], "%H%M").strftime("%H:%M")
     
     # Generate a unique identifier for this booking request
     booking_id = str(uuid.uuid4())
