@@ -73,11 +73,12 @@ def is_valid_email(email):
 
 def print_summary(data):
     day_of_week = data["date"].strftime("%A")
+    date = data['date'].strftime("%d/%m/%Y")
     return (
             f"Booking Details\n"
             f"================\n"
             f"Facility: {data['facility']}\n"
-            f"Date: {data['date'].strftime("%d/%m/%Y")} ({day_of_week})\n"
+            f"Date: {date} ({day_of_week})\n"
             f"Start time: {data['start_time']}\n"
             f"End time: {data['end_time']}\n"
             f"Email: {data['email']}\n"
