@@ -1,15 +1,16 @@
-import re
-import os
-import json
+import re, os, json, gspread, uuid
 from aiogram import types, BaseMiddleware
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from email_validator import validate_email, EmailNotValidError
 from dotenv import load_dotenv
 
 load_dotenv()
 
-ADMIN_USERS_STR = os.getenv("ADMIN_USERS")
-ADMIN_USERS = json.loads(ADMIN_USERS_STR)
+ADMIN_USERS = json.loads(os.getenv("ADMIN_USERS"))
+GSHEET_KEY_ID = os.getenv("GSHEET_KEY_ID")
+gSheet_credentials = json.loads(os.getenv("GSHEET_CREDENTIALS"))
+
 
 class AccessControlMiddleware(BaseMiddleware):
     def __init__(self, allowed_users):
@@ -24,8 +25,8 @@ class AccessControlMiddleware(BaseMiddleware):
             await event.answer(f"You are not authorized to use this bot.")
             return
         return await handler(event, data)
-    
-class Booking(StatesGroup):
+
+class NewBooking(StatesGroup):
     user_id = State()
     facility = State()
     date = State()
@@ -36,8 +37,19 @@ class Booking(StatesGroup):
     name = State()
     contact_number = State()
     confirmation = State()
-    email_for_view = State()
-    email_for_cancel = State()
+
+class BroadcastMessage(StatesGroup):
+    user_id = State()
+    message = State()
+    confirmation = State()
+
+class ViewBooking(StatesGroup):
+    user_id = State()
+    email = State()
+
+class CancelBooking(StatesGroup):
+    user_id = State()
+    email = State()
     booking_to_cancel = State()
 
 def is_valid_time_format(time_str):
@@ -70,6 +82,36 @@ def is_valid_email(email):
         # Email is not valid, exception message is human-readable
         print(str(e))
         return False
+
+async def send_booking_data_to_sheet(data):
+    gc = gspread.service_account_from_dict(gSheet_credentials)
+    sh = gc.open_by_key(GSHEET_KEY_ID)
+    worksheet = sh.worksheet("Booking_Details")
+    new_booking = [str(uuid.uuid4()), data['facility'], data['date'].strftime("%m/%d/%Y"), data['start_time'].strftime("%H:%M"),
+                   data['end_time'].strftime("%H:%M"), data['time_period'],  data['email'], data['name'], data['contact_number']]
+    worksheet.append_row(new_booking, value_input_option="USER_ENTERED")
+    print(new_booking)
+
+async def reply_keyboard(message, text, buttons, one_time=True):
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=btn) for btn in row] for row in buttons],
+        resize_keyboard=True,
+        one_time_keyboard=one_time
+    )
+    await message.reply(text, reply_markup=keyboard)
+
+async def admin_menu(message):
+    await reply_keyboard(message, "Welcome Admin! What would you like to do?", [
+        ["New Booking"],
+        ["View Booking"],
+        ["Broadcast Message"]
+    ])
+
+async def user_menu(message):
+    await reply_keyboard(message, "What would you like to do?", [
+        ["New Booking"],
+        ["View Booking"]
+    ])
 
 def print_summary(data):
     day_of_week = data["date"].strftime("%A")

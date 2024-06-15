@@ -13,5 +13,6 @@ commands = [
     types.BotCommand(command="/view_booking", description="View your booking"),
     types.BotCommand(command="/cancel_booking", description="Cancel your booking"),
     types.BotCommand(command="/help", description="Get help"),
-    types.BotCommand(command="/about", description="About the bot")
+    types.BotCommand(command="/about", description="About the bot"),
+    types.BotCommand(command="/end", description="End the bot")
 ]
