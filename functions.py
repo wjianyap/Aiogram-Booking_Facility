@@ -11,7 +11,6 @@ ADMIN_USERS = json.loads(os.getenv("ADMIN_USERS"))
 GSHEET_KEY_ID = os.getenv("GSHEET_KEY_ID")
 gSheet_credentials = json.loads(os.getenv("GSHEET_CREDENTIALS"))
 
-
 class AccessControlMiddleware(BaseMiddleware):
     def __init__(self, allowed_users):
         super().__init__()
@@ -87,10 +86,9 @@ async def send_booking_data_to_sheet(data):
     gc = gspread.service_account_from_dict(gSheet_credentials)
     sh = gc.open_by_key(GSHEET_KEY_ID)
     worksheet = sh.worksheet("Booking_Details")
-    new_booking = [str(uuid.uuid4()), data['facility'], data['date'].strftime("%m/%d/%Y"), data['start_time'].strftime("%H:%M"),
+    new_booking = [data['user_id'], data['facility'], data['date'].strftime("%m/%d/%Y"), data['start_time'].strftime("%H:%M"),
                    data['end_time'].strftime("%H:%M"), data['time_period'],  data['email'], data['name'], data['contact_number']]
     worksheet.append_row(new_booking, value_input_option="USER_ENTERED")
-    print(new_booking)
 
 async def reply_keyboard(message, text, buttons, one_time=True):
     keyboard = ReplyKeyboardMarkup(

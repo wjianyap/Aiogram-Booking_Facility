@@ -3,10 +3,8 @@ from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import CommandStart
-from aiogram.filters.callback_data import CallbackData
-from aiogram_calendar import SimpleCalendar, SimpleCalendarCallback, get_user_locale
+from aiogram_calendar import SimpleCalendar, SimpleCalendarCallback
 from aiogram.fsm.context import FSMContext
-from aiogram.enums.parse_mode import ParseMode
 from dotenv import load_dotenv
 from aiogram.filters import Command
 
@@ -34,8 +32,6 @@ async def start_handler(message: types.Message):
     else:
         await user_menu(message)
 
-# Broadcast message
-############################################################################################################
 @dp.message(lambda message: "broadcast message" in message.text.lower())
 async def broadcast_message_input(message: types.Message, state: FSMContext):
     if not is_admin(message.from_user.id):
@@ -64,8 +60,6 @@ async def broadcast_message_confirmation_positive(message: types.Message, state:
     await state.clear()
     await start_handler(message)
 
-# New Booking
-############################################################################################################
 @dp.message(lambda message: "new booking" in message.text.lower())
 async def newBooking(message: types.Message, state: FSMContext):
     facility_kb = ReplyKeyboardMarkup(
@@ -99,6 +93,7 @@ async def newBooking_date(call: CallbackQuery, callback_data: dict, state: FSMCo
 @dp.message(NewBooking.start_time)
 async def newBooking_startTime(message: types.Message, state: FSMContext):
     data = await state.get_data()
+    print(datetime.now().date(), type(datetime.now().date()))
     if is_valid_time_format(message.text):
         data['start_time'] = datetime.strptime(message.text, "%H%M").time()
         if data['date'].date() == datetime.now().date() and data['start_time'] < datetime.now().time():
@@ -196,8 +191,7 @@ async def newBooking_confirmation(message: types.Message, state: FSMContext):
             sent_message = await bot.send_message(data['user_id'], "Your booking request has been approved.")
             await send_booking_data_to_sheet(data)
         except Exception as e:
-            logging.error(f"Error sending message to user {data['user_id']}: {e}")
-        booking_requests[booking_id]["processed"] = True    
+            logging.error(f"Error sending message to user {data['user_id']}: {e}")  
     
     await state.clear()
     await start_handler(message) 
@@ -206,8 +200,9 @@ async def newBooking_confirmation(message: types.Message, state: FSMContext):
 async def newBooking_approve(callback_query: CallbackQuery):
     booking_id = callback_query.data.split("_")[1]
     booking_requests[booking_id]["processed"] = True
-    await bot.send_message(booking_requests[booking_id]["data"]['user_id'], f"Your booking request has been approved by {get_admin_id_username(callback_query.from_user.id)[1]}.\n\n{print_summary(booking_requests[booking_id]['data'])}")
+    await bot.send_message(booking_requests[booking_id]["data"]['user_id'], f"Your booking request has been approved by {get_admin_id_username(callback_query.from_user.id)[1]}.\n\n{print_summary(booking_requests[booking_id]['data'])}")  
     await send_booking_data_to_sheet(booking_requests[booking_id]["data"])
+
     for admin_id in all_admin_id():
         try:
             await bot.edit_message_reply_markup(admin_id, booking_requests[booking_id]["message_ids"][admin_id])
@@ -231,10 +226,7 @@ async def newBooking_reject(callback_query: CallbackQuery):
 async def newBooking_confirmation_negative(message: types.Message, state: FSMContext):
     await state.clear()
     await start_handler(message)
-############################################################################################################
 
-# View Booking
-############################################################################################################
 @dp.message(lambda message: "view booking" in message.text.lower())
 async def viewBooking_emailInput(message: types.Message, state: FSMContext):
     await state.set_state(ViewBooking.email)
@@ -259,10 +251,7 @@ async def viewBooking_emailProcessing(message: types.Message, state: FSMContext)
     
     await state.clear()
     await start_handler(message)
-############################################################################################################
-
-# Cancel Booking
-############################################################################################################
+    
 @dp.message(lambda message: "cancel booking" in message.text.lower())
 async def cancelBooking_emailInput(message: types.Message, state: FSMContext):
     await state.set_state(CancelBooking.email)
@@ -324,7 +313,6 @@ async def cancelBooking_bookingToCancel(message: types.Message, state: FSMContex
     
     await state.clear()
     await start_handler(message)
-############################################################################################################
 
 async def help_handler(message: types.Message):
     await message.answer(f"This is the help handler")
