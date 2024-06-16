@@ -119,7 +119,7 @@ async def newBooking_endTime(message: types.Message, state: FSMContext):
                 return
 
         await state.update_data(end_time=data['end_time'])
-        await state.update_data(time_period=f"{data['start_time'].strftime("%H:%M")}-{data['end_time'].strftime("%H:%M")}")
+        await state.update_data(time_period=f"{data['start_time'].strftime('%H:%M')}-{data['end_time'].strftime('%H:%M')}")
         await state.set_state(NewBooking.time_period)
         await state.set_state(NewBooking.email)
 
